@@ -17,7 +17,12 @@ def analyze_pcap(file_path):
     capture = pyshark.FileCapture(file_path)
     # Perform analysis on the capture file
     # Add your analysis code here
-    return "Analysis completed"  # Placeholder message
+    results = "Sample analysis results"  # Placeholder results
+    return results
+
+def print_results(results):
+    print("Analysis Results:")
+    print(results)
 
 def main():
     file_path = select_file()
@@ -28,8 +33,8 @@ def main():
     print(f"Selected file: {file_path}")
     print("Analyzing the file...")
 
-    result = analyze_pcap(file_path)
-    print(result)
+    analysis_results = analyze_pcap(file_path)
+    print_results(analysis_results)
 
 if __name__ == "__main__":
     main()
