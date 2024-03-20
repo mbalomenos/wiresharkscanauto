@@ -2,7 +2,6 @@ import pyshark
 import tkinter as tk
 from tkinter import filedialog
 import logging
-import re
 
 def suppress_pyshark_logs():
     """Suppresses pyshark logs."""
@@ -10,26 +9,28 @@ def suppress_pyshark_logs():
 
 def extract_credentials(packet):
     """Extracts username and password from packet payload."""
-    credentials = re.findall(r'username=(\w+)&password=(\w+)', str(packet))
-    if credentials:
-        return credentials[0]
-    else:
-        return None, None
-
-def extract_shell_command(packet):
-    """Extracts shell commands from packet payload."""
-    # Placeholder function for extracting shell commands
-    # Modify according to the specific protocol and payload format
-    return "shell command"
+    if 'FTP' in packet:
+        if 'User' in packet.ftp.request_command:
+            return packet.ftp.request_command.split()[1], None
+        elif 'PASS' in packet.ftp.request_command:
+            return None, packet.ftp.request_command.split()[1]
+    elif 'HTTP' in packet:
+        return None, None  # Adjust for HTTP payloads
+    elif 'Telnet' in packet:
+        if 'password' in str(packet):
+            return None, packet.telnet.data.split()[1]
+        elif 'login' in str(packet):
+            return packet.telnet.data.split()[1], None
+    return None, None
 
 def analyze_packets(pcap_file):
     """Analyzes packets in the given packet capture file."""
-    attacker_ips = set()
-    victim_ips = set()
-    usernames = set()
     handshake_attempts = {}
     login_attempts = {}
+    attacker_ips = set()
+    victim_ips = set()
     downloaded_executables = []
+    shell_commands = []
 
     filter_expression = 'tcp'
 
@@ -38,28 +39,9 @@ def analyze_packets(pcap_file):
             src_ip, src_mac, dst_ip, dst_mac = extract_addresses(packet)
 
             if packet.tcp.flags_syn == '1' and packet.tcp.flags_ack == '0':
-                # Flagging packets with only SYN flag set
-                # Follow TCP stream to look for usernames and passwords
-                if hasattr(packet.tcp, 'payload') and packet.tcp.payload:
-                    # Extracting credentials from TCP stream
-                    username, password = extract_credentials(packet)
-                    if username and password:
-                        usernames.add(username)
-            elif packet.tcp.flags_syn == '1' and packet.tcp.flags_ack == '1':
-                # Flagging packets with both SYN and ACK flags set
-                # Follow TCP stream to look for usernames and passwords
-                if hasattr(packet.tcp, 'payload') and packet.tcp.payload:
-                    # Extracting credentials from TCP stream
-                    username, password = extract_credentials(packet)
-                    if username and password:
-                        usernames.add(username)
-
-            # Check for repeated handshake attempts
-            if packet.tcp.flags_syn == '1' and packet.tcp.flags_ack == '0':
                 handshake_key = (src_ip, dst_ip, src_mac, dst_mac)
                 handshake_attempts[handshake_key] = handshake_attempts.get(handshake_key, []) + [packet]
-            else:
-                # Check for repeated login attempts
+            elif packet.tcp.flags_syn == '1' and packet.tcp.flags_ack == '1':
                 username, password = extract_credentials(packet)
                 if username and password:
                     login_key = (src_ip, dst_ip, src_mac, dst_mac, username, password)
@@ -70,27 +52,40 @@ def analyze_packets(pcap_file):
 
             # Check for executable downloads
             if hasattr(packet.tcp, 'payload') and packet.tcp.payload and ".exe" in str(packet.tcp.payload):
-                downloaded_executables.append((packet.ip.src, packet.tcp.srcport, packet.tcp.payload))
+                downloaded_executables.append((packet.ip.src, packet.tcp.srcport, packet.tcp.payload, packet.transport_layer))
 
-    # Generating the short paragraph reporting the findings
-    report = "Report on Network Traffic Analysis:\n"
-    report += f"Attacker IP(s) and MAC address(es): {', '.join([f'IP: {ip}, MAC: {src_mac}' for ip in attacker_ips])}\n"
-    report += f"Victim IP(s) and MAC address(es): {', '.join([f'IP: {ip}, MAC: {dst_mac}' for ip in victim_ips])}\n"
-    report += f"Identified compromised usernames: {', '.join(usernames)}\n"
-    if login_attempts:
-        report += "Successful login attempts detected:\n"
-        for key, _ in login_attempts.items():
-            report += f"  IP: {key[0]}, Username: {key[4]}, Password: {key[5]}\n"
-    else:
-        report += "No successful login attempts detected.\n"
-    if downloaded_executables:
-        report += "Malicious executable downloads detected:\n"
-        for ip, port, payload in downloaded_executables:
-            report += f"  IP: {ip}, Port: {port}, Payload: {payload}\n"
-    else:
-        report += "No malicious executable downloads detected.\n"
+            # Check for shell commands
+            if hasattr(packet.tcp, 'payload') and packet.tcp.payload:
+                shell_commands.append(packet.tcp.payload)
 
-    print(report)
+    # Analyze handshake attempts and login attempts for attack types
+    # Adjust this part based on specific attack detection logic
+
+    # Generate report
+    print("Report on Network Traffic Analysis:")
+    print("Attacker IP(s) and MAC address(es):")
+    for ip in attacker_ips:
+        print(f"  IP: {ip}, MAC: {src_mac}")  
+
+    print("\nVictim IP(s) and MAC address(es):")
+    for ip in victim_ips:
+        print(f"  IP: {ip}, MAC: {dst_mac}")  
+
+    print("\nIdentified compromised usernames:")
+    for key in login_attempts:
+        print(f"  Username: {key[4]}")
+
+    print("\nSuccessful login attempts:")
+    for key in login_attempts:
+        print(f"  Username: {key[4]}, Password: {key[5]}")
+
+    print("\nMalicious executable downloads:")
+    for ip, port, payload, protocol in downloaded_executables:
+        print(f"  IP: {ip}, Port: {port}, Protocol: {protocol}, Payload: {payload}")
+
+    print("\nCommands issued during remote shell access:")
+    for command in shell_commands:
+        print(f"  {command}")
 
 def extract_addresses(packet):
     """Extracts source and destination IP addresses and MAC addresses from packet."""
