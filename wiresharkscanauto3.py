@@ -14,6 +14,7 @@ def analyze_packets(pcap_file):
     successful_logins = set()
     malicious_downloads = []
     shell_commands = []
+    passwords = set()
 
     filter_expression = 'tcp'
 
@@ -25,13 +26,14 @@ def analyze_packets(pcap_file):
             dst_mac = packet.eth.dst
 
             if src_ip.startswith("192.168.18."):
-                attacker_ips.add(src_ip)
-                victim_ips.add(dst_ip)
+                attacker_ips.add((src_ip, src_mac))
+                victim_ips.add((dst_ip, dst_mac))
 
                 if hasattr(packet, 'telnet') and packet.telnet:
                     if 'password' in str(packet):
                         password = packet.telnet.data.split()[1]
                         shell_commands.append(password)
+                        passwords.add(password)
                     elif 'login' in str(packet):
                         username = packet.telnet.data.split()[1]
                         identified_usernames.add(username)
@@ -39,33 +41,37 @@ def analyze_packets(pcap_file):
                 if hasattr(packet.tcp, 'payload'):
                     payload = str(packet.tcp.payload).strip()
                     if payload.endswith('.exe'):
-                        malicious_downloads.append((src_ip, dst_ip, payload))
+                        protocol = "TCP" if packet.tcp.srcport else "UDP"
+                        malicious_downloads.append((src_ip, dst_ip, payload, protocol))
                     else:
                         shell_commands.append(payload)
 
     # Generate report
     print("Report on Network Traffic Analysis:")
-    print("Attacker IP(s) and MAC address(es):")
-    for ip in attacker_ips:
-        print(f"  IP: {ip}")
+    print("\n1. Source IP and MAC address of attacker’s machine:")
+    for ip, mac in attacker_ips:
+        print(f"  IP: {ip}, MAC: {mac}")
 
-    print("\nVictim IP(s) and MAC address(es):")
-    for ip in victim_ips:
-        print(f"  IP: {ip}")
+    print("\n   Source IP and MAC address of victim’s machine:")
+    for ip, mac in victim_ips:
+        print(f"  IP: {ip}, MAC: {mac}")
 
-    print("\nIdentified compromised usernames:")
+    print("\n2. Identified usernames the malicious actors are trying to compromise:")
     for username in identified_usernames:
         print(f"  Username: {username}")
 
-    print("\nSuccessful login attempts:")
-    for username in successful_logins:
-        print(f"  Username: {username}")
+    print("\n3. Attack(s) the malicious actor has leveraged to find user passwords:")
+    print("   Telnet sniffing")
 
-    print("\nMalicious executable downloads:")
-    for src_ip, dst_ip, payload in malicious_downloads:
-        print(f"  From: {src_ip}, To: {dst_ip}, Payload: {payload}")
+    print("\n4. Correct password(s):")
+    for password in passwords:
+        print(f"  Password: {password}")
 
-    print("\nCommands issued during remote shell access:")
+    print("\n5. Malicious executable downloads:")
+    for src_ip, dst_ip, payload, protocol in malicious_downloads:
+        print(f"  From: {src_ip}, To: {dst_ip}, Payload: {payload}, Protocol: {protocol}")
+
+    print("\n6. Commands issued when attackers gained remote shell in the victim’s machine:")
     for command in shell_commands:
         print(f"  {command}")
 
