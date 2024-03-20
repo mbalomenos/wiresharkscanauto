@@ -19,11 +19,6 @@ def extract_shell_command(packet):
     # Modify according to the specific protocol and payload format
     return "shell command"
 
-def extract_tcp_stream_payload(packet):
-    """Extracts and returns TCP stream payload."""
-    if 'TCP' in packet:
-        return packet.tcp.payload
-
 def analyze_packets(pcap_file):
     """Analyzes packets in the given packet capture file."""
     handshake_attempts = {}
@@ -38,10 +33,34 @@ def analyze_packets(pcap_file):
         if 'TCP' in packet:
             src_ip, src_mac, dst_ip, dst_mac = extract_addresses(packet)
 
-            if packet.tcp.flags_syn == '1' and packet.tcp.flags_ack == '1':
+            if packet.tcp.flags_syn == '1' and packet.tcp.flags_ack == '0':
+                # Flagging packets with only SYN flag set
+                print("Flagged [SYN] packet:")
+                print(packet)
+
+                # Follow TCP stream to look for usernames and passwords
+                if hasattr(packet.tcp, 'payload') and packet.tcp.payload:
+                    print("Following TCP Stream:")
+                    print(packet.tcp.payload)
+
+                    # Extracting credentials from TCP stream
+                    username, password = extract_credentials(packet)
+                    if username and password:
+                        print(f"Extracted credentials: Username - {username}, Password - {password}")
+            elif packet.tcp.flags_syn == '1' and packet.tcp.flags_ack == '1':
                 # Flagging packets with both SYN and ACK flags set
                 print("Flagged [SYN, ACK] packet:")
                 print(packet)
+
+                # Follow TCP stream to look for usernames and passwords
+                if hasattr(packet.tcp, 'payload') and packet.tcp.payload:
+                    print("Following TCP Stream:")
+                    print(packet.tcp.payload)
+
+                    # Extracting credentials from TCP stream
+                    username, password = extract_credentials(packet)
+                    if username and password:
+                        print(f"Extracted credentials: Username - {username}, Password - {password}")
 
             if packet.tcp.flags_syn == '1' and packet.tcp.flags_ack == '0':
                 handshake_key = (src_ip, dst_ip, src_mac, dst_mac)
