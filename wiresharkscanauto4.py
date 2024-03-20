@@ -14,8 +14,8 @@ def analyze_pcap(file_path):
     capture = pyshark.FileCapture(file_path)
     
     # Initialize variables to store analysis results
-    attacker_ips = set()
-    victim_ips = set()
+    attacker_ip_mac = {}
+    victim_ip_mac = {}
     detected_usernames = set()
     identified_attacks = set()
     detected_passwords = set()
@@ -28,37 +28,41 @@ def analyze_pcap(file_path):
         if "ip" in packet:
             ip_src = packet.ip.src
             ip_dst = packet.ip.dst
-            if "attacker" in packet:
-                attacker_ips.add(ip_src)
-            elif "victim" in packet:
-                victim_ips.add(ip_src)
+            if ip_src not in attacker_ip_mac:
+                attacker_ip_mac[ip_src] = packet.eth.src
+            if ip_dst not in victim_ip_mac:
+                victim_ip_mac[ip_dst] = packet.eth.src
         
         # Identify potential attacks
-        if hasattr(packet, 'http') and "attack" in str(packet.http):
-            identified_attacks.add("HTTP attack detected")
-        elif hasattr(packet, 'tls') and "attack" in str(packet.tls):
-            identified_attacks.add("TLS attack detected")
+        if "smb" in packet:
+            if hasattr(packet.smb, 'ntlmssp_auth_username'):
+                detected_usernames.add(packet.smb.ntlmssp_auth_username)
+                if hasattr(packet.smb, 'ntlmssp_auth_domain'):
+                    detected_usernames.add(packet.smb.ntlmssp_auth_domain + "\\" + packet.smb.ntlmssp_auth_username)
+            if hasattr(packet.smb, 'ntlmssp_lm') or hasattr(packet.smb, 'ntlmssp_lm'):
+                identified_attacks.add("SMB Attack")
         # Add other attack identification logic
         
         # Extract usernames and passwords
-        if hasattr(packet, 'ftp'):
-            if packet.ftp.request_command == "USER":
+        if "ftp" in packet:
+            if hasattr(packet.ftp, 'request_command') and packet.ftp.request_command == "USER":
                 detected_usernames.add(packet.ftp.request_arg)
-            elif packet.ftp.request_command == "PASS":
+            elif hasattr(packet.ftp, 'request_command') and packet.ftp.request_command == "PASS":
                 detected_passwords.add(packet.ftp.request_arg)
         # Add other username and password extraction logic
         
         # Identify malicious downloads
-        if hasattr(packet, 'http') and hasattr(packet.http, 'response'):
-            if packet.http.response.endswith(".exe"):
+        if "http" in packet:
+            if hasattr(packet.http, 'response') and packet.http.response.endswith(".exe"):
                 malicious_downloads.append(packet.http.response)
         # Add other malicious download identification logic
         
         # Extract shell commands
-        if hasattr(packet, 'tcp') and hasattr(packet.tcp, 'payload'):
-            payload = str(packet.tcp.payload)
-            if "whoami" in payload or "systeminfo" in payload:
-                shell_commands.add(payload)
+        if "tcp" in packet:
+            if hasattr(packet.tcp, 'payload'):
+                payload = str(packet.tcp.payload)
+                if "whoami" in payload or "systeminfo" in payload:
+                    shell_commands.add(payload)
         # Add other shell command extraction logic
     
     # Construct the analysis report
@@ -66,10 +70,10 @@ def analyze_pcap(file_path):
 
     # Source and victim IP addresses
     report += "1. What is the source IP and MAC address of attacker’s machine and victim’s machine?\n"
-    for ip in attacker_ips:
-        report += f"   - Attacker's machine:\n     - IP address: {ip}\n"
-    for ip in victim_ips:
-        report += f"   - Victim's machine:\n     - IP address: {ip}\n"
+    for ip, mac in attacker_ip_mac.items():
+        report += f"   - Attacker's machine:\n     - IP address: {ip}\n     - MAC address: {mac}\n"
+    for ip, mac in victim_ip_mac.items():
+        report += f"   - Victim's machine:\n     - IP address: {ip}\n     - MAC address: {mac}\n"
     
     # Detected usernames
     report += "\n2. Identify the usernames the malicious actors are trying to compromise.\n"
