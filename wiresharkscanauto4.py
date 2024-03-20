@@ -24,8 +24,9 @@ def analyze_pcap(file_path):
     # Iterate over each packet in the capture
     for packet in capture:
         # Example: Extract source and destination IP addresses
-        src_ip = packet.ip.src
-        dst_ip = packet.ip.dst
+        if hasattr(packet, 'ip'):
+            src_ip = packet.ip.src
+            dst_ip = packet.ip.dst
         
         # Example: Detect shell commands in TCP payloads
         if hasattr(packet, 'tcp'):
@@ -35,7 +36,7 @@ def analyze_pcap(file_path):
                     shell_commands.append(payload)
         
         # Example: Identify suspicious traffic based on packet size
-        if int(packet.length) > 1500:
+        if hasattr(packet, 'length') and int(packet.length) > 1500:
             suspicious_traffic.append(packet)
     
     # Consolidate analysis results into a dictionary
