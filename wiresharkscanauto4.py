@@ -14,24 +14,29 @@ def analyze_pcap(file_path):
     capture = pyshark.FileCapture(file_path)
     
     # Initialize variables to store analysis results
-    attacker_ip_mac = {}
-    victim_ip_mac = {}
+    attacker_info = {"ip": set(), "mac": set()}
+    victim_info = {"ip": set(), "mac": set()}
     detected_usernames = set()
-    identified_attacks = set()
     detected_passwords = set()
+    identified_attacks = set()
     malicious_downloads = []
     shell_commands = set()
     
     # Iterate over each packet in the capture
     for packet in capture:
-        # Extract IP addresses
+        # Extract IP and MAC addresses
         if "ip" in packet:
-            ip_src = packet.ip.src
-            ip_dst = packet.ip.dst
-            if ip_src not in attacker_ip_mac:
-                attacker_ip_mac[ip_src] = packet.eth.src
-            if ip_dst not in victim_ip_mac:
-                victim_ip_mac[ip_dst] = packet.eth.src
+            src_ip = packet.ip.src
+            dst_ip = packet.ip.dst
+            attacker_info["ip"].add(src_ip)
+            victim_info["ip"].add(dst_ip)
+        if "eth" in packet:
+            src_mac = packet.eth.src
+            dst_mac = packet.eth.dst
+            if src_ip in attacker_info["ip"]:
+                attacker_info["mac"].add(src_mac)
+            elif src_ip in victim_info["ip"]:
+                victim_info["mac"].add(src_mac)
         
         # Identify potential attacks
         if "smb" in packet:
@@ -70,10 +75,16 @@ def analyze_pcap(file_path):
 
     # Source and victim IP addresses
     report += "1. What is the source IP and MAC address of attacker’s machine and victim’s machine?\n"
-    for ip, mac in attacker_ip_mac.items():
-        report += f"   - Attacker's machine:\n     - IP address: {ip}\n     - MAC address: {mac}\n"
-    for ip, mac in victim_ip_mac.items():
-        report += f"   - Victim's machine:\n     - IP address: {ip}\n     - MAC address: {mac}\n"
+    report += "   - Attacker's machine:\n"
+    for ip in attacker_info["ip"]:
+        report += f"     - IP address: {ip}\n"
+    for mac in attacker_info["mac"]:
+        report += f"     - MAC address: {mac}\n"
+    report += "   - Victim's machine:\n"
+    for ip in victim_info["ip"]:
+        report += f"     - IP address: {ip}\n"
+    for mac in victim_info["mac"]:
+        report += f"     - MAC address: {mac}\n"
     
     # Detected usernames
     report += "\n2. Identify the usernames the malicious actors are trying to compromise.\n"
