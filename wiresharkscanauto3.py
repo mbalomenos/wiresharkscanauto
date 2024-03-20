@@ -8,13 +8,14 @@ def suppress_pyshark_logs():
 
 def analyze_packets(pcap_file):
     """Analyzes packets in the given packet capture file."""
-    attacker_ips = set()
-    victim_ips = set()
+    attacker_ip = ""
+    attacker_mac = ""
+    victim_ip = ""
+    victim_mac = ""
     identified_usernames = set()
-    successful_logins = set()
-    malicious_downloads = []
+    brute_force_attacks = set()
+    malicious_executables = []
     shell_commands = []
-    passwords = set()
 
     filter_expression = 'tcp'
 
@@ -26,50 +27,47 @@ def analyze_packets(pcap_file):
             dst_mac = packet.eth.dst
 
             if src_ip.startswith("192.168.18."):
-                attacker_ips.add((src_ip, src_mac))
-                victim_ips.add((dst_ip, dst_mac))
+                attacker_ip = src_ip
+                attacker_mac = src_mac
+                victim_ip = dst_ip
+                victim_mac = dst_mac
 
                 if hasattr(packet, 'telnet') and packet.telnet:
                     if 'password' in str(packet):
-                        password = packet.telnet.data.split()[1]
-                        shell_commands.append(password)
-                        passwords.add(password)
+                        brute_force_attacks.add((packet.telnet.data.split()[1], packet.ip.src, packet.ip.dst))
                     elif 'login' in str(packet):
-                        username = packet.telnet.data.split()[1]
-                        identified_usernames.add(username)
+                        identified_usernames.add(packet.telnet.data.split()[1])
 
                 if hasattr(packet.tcp, 'payload'):
                     payload = str(packet.tcp.payload).strip()
                     if payload.endswith('.exe'):
-                        protocol = "TCP" if packet.tcp.srcport else "UDP"
-                        malicious_downloads.append((src_ip, dst_ip, payload, protocol))
+                        malicious_executables.append((packet.ip.src, packet.ip.dst, payload))
                     else:
                         shell_commands.append(payload)
 
     # Generate report
     print("Report on Network Traffic Analysis:")
     print("\n1. Source IP and MAC address of attacker’s machine:")
-    for ip, mac in attacker_ips:
-        print(f"  IP: {ip}, MAC: {mac}")
-
+    print(f"  IP address: {attacker_ip}")
+    print(f"  MAC address: {attacker_mac}")
     print("\n   Source IP and MAC address of victim’s machine:")
-    for ip, mac in victim_ips:
-        print(f"  IP: {ip}, MAC: {mac}")
+    print(f"  IP address: {victim_ip}")
+    print(f"  MAC address: {victim_mac}")
 
     print("\n2. Identified usernames the malicious actors are trying to compromise:")
     for username in identified_usernames:
         print(f"  Username: {username}")
 
     print("\n3. Attack(s) the malicious actor has leveraged to find user passwords:")
-    print("   Telnet sniffing")
+    print("   Brute Force Attack")
 
     print("\n4. Correct password(s):")
-    for password in passwords:
-        print(f"  Password: {password}")
+    for password, src_ip, dst_ip in brute_force_attacks:
+        print(f"  Password: {password}, Source IP: {src_ip}, Destination IP: {dst_ip}")
 
     print("\n5. Malicious executable downloads:")
-    for src_ip, dst_ip, payload, protocol in malicious_downloads:
-        print(f"  From: {src_ip}, To: {dst_ip}, Payload: {payload}, Protocol: {protocol}")
+    for src_ip, dst_ip, payload in malicious_executables:
+        print(f"  From: {src_ip}, To: {dst_ip}, Payload: {payload}")
 
     print("\n6. Commands issued when attackers gained remote shell in the victim’s machine:")
     for command in shell_commands:
