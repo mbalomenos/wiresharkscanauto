@@ -14,89 +14,98 @@ def analyze_pcap(file_path):
     capture = pyshark.FileCapture(file_path)
     
     # Initialize variables to store analysis results
-    identified_attacks = set()
+    attacker_info = {}
+    victim_info = {}
     detected_usernames = set()
+    identified_attacks = set()
     detected_passwords = set()
-    malicious_downloads = set()
+    malicious_downloads = []
     shell_commands = set()
-    tcp_flags = set()
     
     # Iterate over each packet in the capture
     for packet in capture:
-        # Example: Detect potential attacks and threats
-        if hasattr(packet, 'http'):
-            if "attack" in str(packet.http):
-                identified_attacks.add("HTTP attack detected")
-        elif hasattr(packet, 'tls'):
-            if "attack" in str(packet.tls):
-                identified_attacks.add("TLS attack detected")
-        elif hasattr(packet, 'ftp'):
-            if "attack" in str(packet.ftp):
-                identified_attacks.add("FTP attack detected")
-        elif hasattr(packet, 'smb'):
-            if "attack" in str(packet.smb):
-                identified_attacks.add("SMB attack detected")
-        elif hasattr(packet, 'smb2'):
-            if "attack" in str(packet.smb2):
-                identified_attacks.add("SMB2 attack detected")
+        # Extract IP and MAC addresses
+        if "ip" in packet:
+            ip_src = packet.ip.src
+            mac_src = packet.eth.src
+            if ip_src not in attacker_info:
+                attacker_info[ip_src] = mac_src
+            else:
+                victim_info[ip_src] = mac_src
         
-        # Example: Extract potential usernames and passwords from packets
-        if hasattr(packet, 'ftp') and hasattr(packet.ftp, 'request_command'):
+        # Identify potential attacks
+        if hasattr(packet, 'http') and "attack" in str(packet.http):
+            identified_attacks.add("HTTP attack detected")
+        elif hasattr(packet, 'tls') and "attack" in str(packet.tls):
+            identified_attacks.add("TLS attack detected")
+        # Add other attack identification logic
+        
+        # Extract usernames and passwords
+        if hasattr(packet, 'ftp'):
             if packet.ftp.request_command == "USER":
                 detected_usernames.add(packet.ftp.request_arg)
             elif packet.ftp.request_command == "PASS":
                 detected_passwords.add(packet.ftp.request_arg)
-        elif hasattr(packet, 'http') and hasattr(packet.http, 'request_uri'):
-            if packet.http.request_uri.startswith("/login"):
-                detected_usernames.add(packet.http.authbasic_user)
-                detected_passwords.add(packet.http.authbasic_password)
-        elif hasattr(packet, 'smb') and hasattr(packet.smb, 'user'):
-            detected_usernames.add(packet.smb.user)
-        elif hasattr(packet, 'smb2') and hasattr(packet.smb2, 'user'):
-            detected_usernames.add(packet.smb2.user)
+        # Add other username and password extraction logic
         
-        # Example: Identify malicious downloads
+        # Identify malicious downloads
         if hasattr(packet, 'http') and hasattr(packet.http, 'response'):
-            if "malicious_file.exe" in packet.http.response:
-                malicious_downloads.add("malicious_file.exe")
+            if packet.http.response.endswith(".exe"):
+                malicious_downloads.append(packet.http.response)
+        # Add other malicious download identification logic
         
-        # Example: Identify shell commands
+        # Extract shell commands
         if hasattr(packet, 'tcp') and hasattr(packet.tcp, 'payload'):
             payload = str(packet.tcp.payload)
             if "whoami" in payload or "systeminfo" in payload:
                 shell_commands.add(payload)
-        
-        # Example: Extract TCP flags
-        if hasattr(packet, 'tcp') and hasattr(packet.tcp, 'flags'):
-            tcp_flags.add(packet.tcp.flags)
+        # Add other shell command extraction logic
     
-    # Consolidate analysis results into a dictionary
-    analysis_results = {
-        "Identified Attacks": identified_attacks,
-        "Detected Usernames": detected_usernames,
-        "Detected Passwords": detected_passwords,
-        "Malicious Downloads": malicious_downloads,
-        "Shell Commands": shell_commands,
-        "TCP Flags": tcp_flags
-    }
+    # Construct the analysis report
+    report = f"Analysis Report:\n\n"
     
-    return analysis_results
-
-def print_report(analysis_results):
-    print("\nAnalysis Report:")
-    for category, results in analysis_results.items():
-        print(f"\n{category}:")
-        if results:
-            for result in results:
-                print(f" - {result}")
-        else:
-            print("   No relevant data found.")
+    # Source and victim IP/MAC addresses
+    report += "1. What is the source IP and MAC address of attacker’s machine and victim’s machine?\n"
+    for ip, mac in attacker_info.items():
+        report += f"   - Attacker's machine:\n     - IP address: {ip}\n     - MAC address: {mac}\n"
+    for ip, mac in victim_info.items():
+        report += f"   - Victim's machine:\n     - IP address: {ip}\n     - MAC address: {mac}\n"
+    
+    # Detected usernames
+    report += "\n2. Identify the usernames the malicious actors are trying to compromise.\n"
+    for username in detected_usernames:
+        report += f"   - {username}\n"
+    
+    # Identified attacks
+    report += "\n3. Which attack(s) the malicious actor has leveraged in order to find user passwords?\n"
+    for attack in identified_attacks:
+        report += f"   - {attack}\n"
+    
+    # Detected passwords
+    report += "\n4. Can you spot the correct password(s)?\n"
+    for password in detected_passwords:
+        report += f"   - {password}\n"
+    
+    # Malicious downloads
+    report += "\n5. How many times a malicious executable (“.EXE”) has been downloaded into the victim’s machine and through which protocol? Provide name(s).\n"
+    if malicious_downloads:
+        for i, download in enumerate(malicious_downloads, 1):
+            report += f"   - {i}. {download}\n"
+    else:
+        report += "   No malicious executables downloaded.\n"
+    
+    # Shell commands
+    report += "\n6. What commands the attackers issued when they gained remote shell in the victim’s machine?\n"
+    for command in shell_commands:
+        report += f"   - {command.strip()}\n"
+    
+    return report
 
 def main():
     file_path = choose_file()
     if file_path:
-        analysis_results = analyze_pcap(file_path)
-        print_report(analysis_results)
+        analysis_report = analyze_pcap(file_path)
+        print(analysis_report)
     else:
         print("No file selected.")
 
