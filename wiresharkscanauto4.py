@@ -27,13 +27,16 @@ def analyze_pcap(file_path):
         if hasattr(packet, 'ip'):
             src_ip = packet.ip.src
             dst_ip = packet.ip.dst
-        
+            if src_ip == "192.168.18.130":
+                attacker_ips.add(src_ip)
+            else:
+                victim_ips.add(src_ip)
+            
         # Example: Detect shell commands in TCP payloads
-        if hasattr(packet, 'tcp'):
-            if packet.tcp.payload:
-                payload = str(packet.tcp.payload)
-                if "whoami" in payload or "systeminfo" in payload:
-                    shell_commands.append(payload)
+        if hasattr(packet, 'tcp') and hasattr(packet.tcp, 'payload'):
+            payload = str(packet.tcp.payload)
+            if "whoami" in payload or "systeminfo" in payload:
+                shell_commands.append(payload)
         
         # Example: Identify suspicious traffic based on packet size
         if hasattr(packet, 'length') and int(packet.length) > 1500:
@@ -43,8 +46,6 @@ def analyze_pcap(file_path):
     analysis_results = {
         "Attacker IPs": list(attacker_ips),
         "Victim IPs": list(victim_ips),
-        "Identified Usernames": list(identified_usernames),
-        "Malicious Downloads": malicious_downloads,
         "Shell Commands": shell_commands,
         "Suspicious Traffic": suspicious_traffic
     }
