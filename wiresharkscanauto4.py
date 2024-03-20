@@ -14,8 +14,8 @@ def analyze_pcap(file_path):
     capture = pyshark.FileCapture(file_path)
     
     # Initialize variables to store analysis results
-    attacker_info = {}
-    victim_info = {}
+    attacker_ips = set()
+    victim_ips = set()
     detected_usernames = set()
     identified_attacks = set()
     detected_passwords = set()
@@ -24,14 +24,14 @@ def analyze_pcap(file_path):
     
     # Iterate over each packet in the capture
     for packet in capture:
-        # Extract IP and MAC addresses
+        # Extract IP addresses
         if "ip" in packet:
             ip_src = packet.ip.src
-            mac_src = packet.eth.src
-            if ip_src not in attacker_info:
-                attacker_info[ip_src] = mac_src
-            else:
-                victim_info[ip_src] = mac_src
+            ip_dst = packet.ip.dst
+            if "attacker" in packet:
+                attacker_ips.add(ip_src)
+            elif "victim" in packet:
+                victim_ips.add(ip_src)
         
         # Identify potential attacks
         if hasattr(packet, 'http') and "attack" in str(packet.http):
@@ -62,14 +62,14 @@ def analyze_pcap(file_path):
         # Add other shell command extraction logic
     
     # Construct the analysis report
-    report = f"Analysis Report:\n\n"
-    
-    # Source and victim IP/MAC addresses
+    report = "Analysis Report:\n\n"
+
+    # Source and victim IP addresses
     report += "1. What is the source IP and MAC address of attacker’s machine and victim’s machine?\n"
-    for ip, mac in attacker_info.items():
-        report += f"   - Attacker's machine:\n     - IP address: {ip}\n     - MAC address: {mac}\n"
-    for ip, mac in victim_info.items():
-        report += f"   - Victim's machine:\n     - IP address: {ip}\n     - MAC address: {mac}\n"
+    for ip in attacker_ips:
+        report += f"   - Attacker's machine:\n     - IP address: {ip}\n"
+    for ip in victim_ips:
+        report += f"   - Victim's machine:\n     - IP address: {ip}\n"
     
     # Detected usernames
     report += "\n2. Identify the usernames the malicious actors are trying to compromise.\n"
