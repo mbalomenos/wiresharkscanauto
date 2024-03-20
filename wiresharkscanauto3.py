@@ -8,6 +8,8 @@ def analyze_pcapng(pcapng_file):
     identified_usernames = set()
     malicious_downloads = []
     shell_commands = []
+    src_mac = None
+    dst_mac = None
 
     for packet in pyshark.FileCapture(pcapng_file):
         if 'IP' in packet and 'TCP' in packet:
@@ -31,9 +33,9 @@ def analyze_pcapng(pcapng_file):
                     else:
                         shell_commands.append(payload)
 
-    return attacker_ips, victim_ips, identified_usernames, malicious_downloads, shell_commands
+    return attacker_ips, victim_ips, identified_usernames, malicious_downloads, shell_commands, src_mac, dst_mac
 
-def print_analysis(attacker_ips, victim_ips, identified_usernames, malicious_downloads, shell_commands):
+def print_analysis(attacker_ips, victim_ips, identified_usernames, malicious_downloads, shell_commands, src_mac, dst_mac):
     print("Thank you for providing the pcapng file. I will now proceed to analyze its contents to generate the answers to the questions you provided earlier. I'll let you know once the analysis is complete.\n")
     print("I have analyzed the pcapng file and extracted the necessary information to answer your questions. Here are the answers:\n")
 
@@ -82,8 +84,8 @@ def select_file():
 def main():
     file_path = select_file()
     if file_path:
-        attacker_ips, victim_ips, identified_usernames, malicious_downloads, shell_commands = analyze_pcapng(file_path)
-        print_analysis(attacker_ips, victim_ips, identified_usernames, malicious_downloads, shell_commands)
+        attacker_ips, victim_ips, identified_usernames, malicious_downloads, shell_commands, src_mac, dst_mac = analyze_pcapng(file_path)
+        print_analysis(attacker_ips, victim_ips, identified_usernames, malicious_downloads, shell_commands, src_mac, dst_mac)
 
 if __name__ == "__main__":
     main()
