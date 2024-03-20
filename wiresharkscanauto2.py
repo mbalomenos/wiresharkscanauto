@@ -55,7 +55,7 @@ def analyze_packets(pcap_file):
             victim_ips.add(dst_ip)
 
             # Check for executable downloads
-            if packet.tcp.payload and ".exe" in str(packet.tcp.payload):
+            if hasattr(packet.tcp, 'payload') and packet.tcp.payload and ".exe" in str(packet.tcp.payload):
                 downloaded_executables.append((packet.ip.src, packet.tcp.srcport, packet.tcp.payload))
 
     attack_type = determine_attack(handshake_attempts.values(), login_attempts.values())
