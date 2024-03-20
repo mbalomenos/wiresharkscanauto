@@ -1,11 +1,6 @@
 import pyshark
 import tkinter as tk
 from tkinter import filedialog
-import logging
-
-def suppress_pyshark_logs():
-    """Suppresses pyshark logs."""
-    logging.getLogger("pyshark").setLevel(logging.ERROR)
 
 def analyze_pcapng(pcapng_file):
     attacker_ips = set()
@@ -30,16 +25,16 @@ def analyze_pcapng(pcapng_file):
                         identified_usernames.add(packet.smb.user)
 
                 if hasattr(packet.tcp, 'payload'):
-                    payload = str(packet.tcp.payload).strip()
+                    payload = bytes.fromhex(str(packet.tcp.payload).strip().replace(':', '')).decode('utf-8', errors='ignore')
                     if payload.endswith('.exe'):
                         malicious_downloads.append((packet.sniff_time, payload))
                     else:
                         shell_commands.append(payload)
 
-    # Generate report
-    print("Thank you for providing the link to the pcapng file. I will now proceed to download the file and analyze its contents to generate the answers to the questions you provided earlier. I'll let you know once the analysis is complete.\n")
-    print("I've downloaded the pcapng file from the provided link. Now, I'll analyze the packets in the file to extract the information needed to answer your questions. This may take a moment. I'll notify you as soon as the analysis is done.\n")
+    return attacker_ips, victim_ips, identified_usernames, malicious_downloads, shell_commands
 
+def print_analysis(attacker_ips, victim_ips, identified_usernames, malicious_downloads, shell_commands):
+    print("Thank you for providing the pcapng file. I will now proceed to analyze its contents to generate the answers to the questions you provided earlier. I'll let you know once the analysis is complete.\n")
     print("I have analyzed the pcapng file and extracted the necessary information to answer your questions. Here are the answers:\n")
 
     print("1. **Source IP and MAC address of attacker’s machine and victim’s machine:**")
@@ -75,12 +70,20 @@ def analyze_pcapng(pcapng_file):
         print(f"   - Commands: {command}")
 
 def select_file():
-    """Opens file dialog to select a .pcap or .pcapng file."""
     root = tk.Tk()
     root.withdraw()  # Hide the main window
     file_path = filedialog.askopenfilename(title="Select .pcap or .pcapng file", filetypes=[("PCAP files", "*.pcap *.pcapng")])
     if file_path:
-        analyze_pcapng(file_path)
+        return file_path
+    else:
+        print("No file selected.")
+        return None
+
+def main():
+    file_path = select_file()
+    if file_path:
+        attacker_ips, victim_ips, identified_usernames, malicious_downloads, shell_commands = analyze_pcapng(file_path)
+        print_analysis(attacker_ips, victim_ips, identified_usernames, malicious_downloads, shell_commands)
 
 if __name__ == "__main__":
-    select_file()
+    main()
