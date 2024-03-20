@@ -28,7 +28,6 @@ def analyze_packets(pcap_file):
     """Analyzes packets in the given packet capture file."""
     handshake_attempts = {}
     login_attempts = {}
-    shell_commands = []
     attacker_ips = set()
     victim_ips = set()
     downloaded_executables = []
@@ -52,9 +51,6 @@ def analyze_packets(pcap_file):
                 if username and password:
                     login_key = (src_ip, dst_ip, src_mac, dst_mac, username, password)
                     login_attempts[login_key] = login_attempts.get(login_key, []) + [packet]
-                shell_command = extract_shell_command(packet)
-                if shell_command:
-                    shell_commands.append(shell_command)
 
             attacker_ips.add(src_ip)
             victim_ips.add(dst_ip)
@@ -86,11 +82,6 @@ def analyze_packets(pcap_file):
             print(f"  Source IP: {key[0]}, Destination IP: {key[1]}")
             print(f"  Source MAC: {key[2]}, Destination MAC: {key[3]}")
             print(f"  Username: {key[4]}, Password: {key[5]}")
-
-    if shell_commands:
-        print("\nDetected shell commands:")
-        for command in shell_commands:
-            print(f"  Shell Command: {command}")
 
     if downloaded_executables:
         print("\nDownloaded executables:")
