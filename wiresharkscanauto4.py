@@ -1,4 +1,13 @@
+import tkinter as tk
+from tkinter import filedialog
 import pyshark
+
+def choose_file():
+    root = tk.Tk()
+    root.withdraw()  # Hide the main window
+
+    file_path = filedialog.askopenfilename(filetypes=[("PCAPNG files", "*.pcapng"), ("PCAP files", "*.pcap")])
+    return file_path
 
 def analyze_pcap(file_path):
     print("Analyzing the file:", file_path)
@@ -56,9 +65,12 @@ def print_results(analysis_results):
             print("   No results found.")
 
 def main():
-    file_path = input("Enter the path to the .pcapng or .pcap file: ")
-    analysis_results = analyze_pcap(file_path)
-    print_results(analysis_results)
+    file_path = choose_file()
+    if file_path:
+        analysis_results = analyze_pcap(file_path)
+        print_results(analysis_results)
+    else:
+        print("No file selected.")
 
 if __name__ == "__main__":
     main()
